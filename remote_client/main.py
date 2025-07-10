@@ -8,36 +8,38 @@ load_dotenv()
 MQTT_BROKER = os.getenv("MQTT_BROKER")
 MQTT_PORT = int(os.getenv("MQTT_PORT"))
 MQTT_SUB_TOPIC = os.getenv("MQTT_SUB_TOPIC")
-MQTT_PUB_TOPIC = os.getenv("MQTT_PUB_TOPIC")
+MQTT_STATE_PUB_TOPIC = os.getenv("MQTT_STATE_PUB_TOPIC")
+MQTT_WOL_PUB_TOPIC = os.getenv("MQTT_WOL_PUB_TOPIC")
 MQTT_USERNAME = os.getenv("MQTT_USERNAME")
 MQTT_PASSWORD = os.getenv("MQTT_PASSWORD")
 CA_CERT = os.getenv("CA_CERT")
-QOS_PUB = int(os.getenv("QOS_PUB"))
-QOS_SUB = int(os.getenv("QOS_SUB"))
+QOS = int(os.getenv("QOS"))
 CLEAN_SESSION = bool(os.getenv("CLEAN_SESSION"))
 
 MAC_ADDRESS = os.getenv("MAC_ADDRESS")
+IP_ADDRESS = os.getenv("IP_ADDRESS")
 
-server_state = "unknown"
-
+waiting = False
 
 # Callback: on connect
 def on_connect(client: mqtt.Client, userdata, flags, rc, properties):
     print("Connected with result code: " + str(rc))
-    client.subscribe(MQTT_SUB_TOPIC, qos=QOS_SUB)
+    client.subscribe(MQTT_SUB_TOPIC, qos=QOS)
 
 # Callback: on message
 def on_message(client, userdata, msg):
-    global server_state
     if msg.topic == MQTT_SUB_TOPIC:
-        server_state = msg.payload.decode()
-    print_server_state()
+        global waiting
+        print("Server state:", msg.payload.decode())
+        waiting = False
 
-def print_server_state():
-    print("Server state:", server_state)
+def ask_for_server_state(client: mqtt.Client):
+    global waiting
+    client.publish(MQTT_STATE_PUB_TOPIC, IP_ADDRESS, QOS)
+    waiting = True
 
 def send_wol_signal(client: mqtt.Client):
-    client.publish(MQTT_PUB_TOPIC, MAC_ADDRESS, QOS_PUB)
+    client.publish(MQTT_WOL_PUB_TOPIC, MAC_ADDRESS, QOS)
 
 def main():
     # Client initialization
@@ -58,9 +60,12 @@ def main():
     client.connect(MQTT_BROKER, MQTT_PORT, keepalive=60)
 
     client.loop_start()
+    ask_for_server_state(client)
 
     menu = True
     while menu:
+        while waiting:
+            pass
         print("\nSelect option from menu below:")
         print("poweron - power on server")
         print("state - check server state")
@@ -69,7 +74,8 @@ def main():
         if opt == "poweron":
             send_wol_signal(client)
         elif opt == "state":
-            print_server_state()
+            print("Waiting for response...")
+            ask_for_server_state(client)
         elif opt == "quit":
             menu = False
         else:
