@@ -21,6 +21,8 @@ const long gmt_offset_sec = 0;            // GMT offset in seconds (adjust for y
 const int daylight_offset_sec = 0;        // Daylight saving time offset in seconds
 
 const char *WOL_TOPIC = "testtopic/#";
+const char *STATE_SUB_TOPIC = "testtopic/#";
+const char *STATE_PUB_TOPIC = "testtopic/#";
 const int WOL_PORT = 9;
 
 #endif

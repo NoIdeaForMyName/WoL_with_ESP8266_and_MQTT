@@ -1,4 +1,5 @@
 #include <ESP8266WiFi.h>
+#include <ESP8266Ping.h>
 #include <PubSubClient.h>
 #include <WiFiUdp.h>
 #include <WakeOnLan.h>
@@ -24,6 +25,8 @@ void connectToMQTT();
 void syncTime();
 
 void mqttCallback(char *topic, byte *payload, unsigned int length);
+
+bool is_device_alive(char *ip_address);
 
 void setup() {
     connectToWiFi();
@@ -58,6 +61,7 @@ void connectToMQTT() {
         String client_id = "esp8266-client-" + String(WiFi.macAddress());
         if (mqtt_client.connect(client_id.c_str(), mqtt_username, mqtt_password, nullptr, 0, false, nullptr, clean_session)) {
             mqtt_client.subscribe(WOL_TOPIC, QoS);
+            mqtt_client.subscribe(STATE_SUB_TOPIC, QoS);
         } else {
             char err_buf[128];
             espClient.getLastSSLError(err_buf, sizeof(err_buf));
@@ -67,16 +71,44 @@ void connectToMQTT() {
 }
 
 void mqttCallback(char *topic, byte *payload, unsigned int length) {
-    if (strcmp(topic, WOL_TOPIC) == 0) {
-        char *mac_address = new char[length+1];
-        for (int i = 0; i < length; i++) {
-            mac_address[i] = (char) payload[i];
-        }
-        mac_address[length] = '\0';
-
-        WOL.sendMagicPacket(mac_address, WOL_PORT);
-        delete[] mac_address;
+    char *payload_chr = new char[length+1];
+    for (int i = 0; i < length; i++) {
+        payload_chr[i] = (char) payload[i];
     }
+    payload_chr[length] = '\0';
+
+    if (strcmp(topic, WOL_TOPIC) == 0) {
+        WOL.sendMagicPacket(payload_chr, WOL_PORT);
+    }
+    else if (strcmp(topic, STATE_SUB_TOPIC) == 0) {
+        char msg[100];
+
+        char *err = nullptr;
+        if (is_device_alive(payload_chr, &err)) {
+            snprintf(msg, sizeof(msg), "%s: [alive]", payload_chr);
+        }
+        else if (err == nullptr) {
+            snprintf(msg, sizeof(msg), "%s: [dead]", payload_chr);
+        }
+        else {
+            snprintf(msg, sizeof(msg), "%s: [error] - %s", payload_chr, err);
+            delete[] err;
+        }
+
+        mqtt_client.publish(STATE_PUB_TOPIC, msg);
+    }
+
+    delete[] payload_chr;
+}
+
+bool is_device_alive(char *ip_address, char **err) {
+    IPAddress ip;
+    if (ip.fromString(ip_address)) {
+        return Ping.ping(ip);
+    }
+    *err = new char[100];
+    snprintf(*err, 100, "Invalid IP address: %s", ip_address);
+    return false;
 }
 
 void loop() {
