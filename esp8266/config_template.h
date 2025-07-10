@@ -12,6 +12,8 @@ const int mqtt_port = 8883;  // MQTT port (TLS)
 const char *mqtt_broker = "broker.emqx.io";  // EMQX broker endpoint
 const char *mqtt_username = "emqx";  // MQTT username for authentication
 const char *mqtt_password = "public";  // MQTT password for authentication
+const int QoS = 1;
+const bool clean_session = true;
 
 // NTP Server settings
 const char *ntp_server = "pool.ntp.org";     // Default NTP server

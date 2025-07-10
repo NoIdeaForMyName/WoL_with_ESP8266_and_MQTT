@@ -56,8 +56,8 @@ void connectToMQTT() {
     espClient.setTrustAnchors(&serverTrustedCA);
     while (!mqtt_client.connected()) {
         String client_id = "esp8266-client-" + String(WiFi.macAddress());
-        if (mqtt_client.connect(client_id.c_str(), mqtt_username, mqtt_password)) {
-            mqtt_client.subscribe(WOL_TOPIC);
+        if (mqtt_client.connect(client_id.c_str(), mqtt_username, mqtt_password, nullptr, 0, false, nullptr, clean_session)) {
+            mqtt_client.subscribe(WOL_TOPIC, QoS);
         } else {
             char err_buf[128];
             espClient.getLastSSLError(err_buf, sizeof(err_buf));
